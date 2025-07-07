@@ -51,7 +51,7 @@ services:
                 - mysqladmin
                 - ping
                 - '-p${DB_PASSWORD}'
-            retries: 3
+            retries: 3x1
             timeout: 5s
     redis:
         image: 'redis:alpine'

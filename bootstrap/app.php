@@ -12,7 +12,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->alias([
+            'check.token.expiration' => \App\Http\Middleware\CheckTokenExpiration::class,
+            'auth' => \App\Http\Middleware\Authenticate::class,
+        ]);
+        
+        // Configurar Sanctum para APIs
+        $middleware->api([
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
