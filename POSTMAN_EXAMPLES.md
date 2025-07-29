@@ -6,12 +6,95 @@
 
 ---
 
-## 1. OBTENER LISTA DE CATEGORÍAS
+## 🔐 AUTENTICACIÓN
+
+### Configuración de Variables de Entorno
+Antes de probar los endpoints, configura estas variables en Postman:
+
+1. **Variables de Entorno:**
+   - `base_url`: `http://localhost:8000/api`
+   - `token`: (se llenará automáticamente después del login)
+
+2. **Configurar Auto-guardado del Token:**
+   En el request de login, agrega este script en la pestaña "Tests":
+   ```javascript
+   if (pm.response.code === 200) {
+       const response = pm.response.json();
+       pm.environment.set("token", response.token);
+   }
+   ```
+
+---
+
+## 1. REGISTRO DE USUARIO
+**POST** `/register`
+
+### Headers:
+```
+Content-Type: application/json
+```
+
+### Body:
+```json
+{
+  "nombre_usuario": "chef_juan",
+  "nombre_completo": "Juan Pérez",
+  "email": "juan@ejemplo.com",
+  "password": "123456"
+}
+```
+
+### Response esperado:
+```json
+{
+  "token": "1|abc123def456...",
+  "data": {
+    "id": 1,
+    "nombre_usuario": "chef_juan",
+    "email": "juan@ejemplo.com"
+  }
+}
+```
+
+---
+
+## 2. LOGIN DE USUARIO
+**POST** `/login`
+
+### Headers:
+```
+Content-Type: application/json
+```
+
+### Body:
+```json
+{
+  "email": "juan@ejemplo.com",
+  "password": "123456"
+}
+```
+
+### Response esperado:
+```json
+{
+  "token": "2|xyz789abc123...",
+  "data": {
+    "id": 1,
+    "nombre_usuario": "chef_juan",
+    "email": "juan@ejemplo.com"
+  }
+}
+```
+
+---
+
+## 3. OBTENER LISTA DE CATEGORÍAS
 **GET** `/categorias/lista`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -40,12 +123,13 @@ Content-Type: application/json
 
 ---
 
-## 2. OBTENER LISTA DE INGREDIENTES
+## 4. OBTENER LISTA DE INGREDIENTES
 **GET** `/ingredientes/lista`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Query Parameters (opcional):
@@ -88,12 +172,13 @@ busqueda=huevo
 
 ---
 
-## 3. CREAR NUEVO INGREDIENTE
+## 5. CREAR NUEVO INGREDIENTE
 **POST** `/ingredientes/crear`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -118,12 +203,13 @@ Content-Type: application/json
 
 ---
 
-## 4. OBTENER LISTA DE ETIQUETAS
+## 6. OBTENER LISTA DE ETIQUETAS
 **GET** `/etiquetas/lista`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Query Parameters (opcional):
@@ -166,12 +252,13 @@ busqueda=sin
 
 ---
 
-## 5. CREAR RECETA
+## 7. CREAR RECETA
 **POST** `/post`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -223,12 +310,13 @@ Content-Type: application/json
 
 ---
 
-## 6. OBTENER RECETA COMPLETA
+## 8. OBTENER RECETA COMPLETA
 **GET** `/receta/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -290,12 +378,13 @@ Content-Type: application/json
 
 ---
 
-## 7. OBTENER FEED DE RECETAS
+## 9. OBTENER FEED DE RECETAS
 **GET** `/feed?usuario_id=1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -334,12 +423,13 @@ Content-Type: application/json
 
 ---
 
-## 8. BUSCAR RECETAS POR ETIQUETAS
+## 10. BUSCAR RECETAS POR ETIQUETAS
 **GET** `/recetas/buscar?etiquetas_ids[]=1&etiquetas_ids[]=2&usuario_id=1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -378,12 +468,13 @@ Content-Type: application/json
 
 ---
 
-## 9. EDITAR RECETA
+## 11. EDITAR RECETA
 **PUT** `/receta/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -433,12 +524,13 @@ Content-Type: application/json
 
 ---
 
-## 10. AGREGAR A FAVORITOS
+## 12. AGREGAR A FAVORITOS
 **POST** `/favorito`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -461,12 +553,13 @@ Content-Type: application/json
 
 ---
 
-## 11. OBTENER FAVORITOS
+## 13. OBTENER FAVORITOS
 **GET** `/favoritos?usuario_id=2`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -506,12 +599,13 @@ Content-Type: application/json
 
 ---
 
-## 12. CREAR COMENTARIO
+## 14. CREAR COMENTARIO
 **POST** `/comentario`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -535,12 +629,13 @@ Content-Type: application/json
 
 ---
 
-## 13. OBTENER COMENTARIOS
+## 15. OBTENER COMENTARIOS
 **GET** `/comentarios?receta_id=1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -561,12 +656,13 @@ Content-Type: application/json
 
 ---
 
-## 14. CREAR VALORACIÓN
+## 16. CREAR VALORACIÓN
 **POST** `/valoracion`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -590,12 +686,13 @@ Content-Type: application/json
 
 ---
 
-## 15. OBTENER VALORACIONES
+## 17. OBTENER VALORACIONES
 **GET** `/valoraciones?receta_id=1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -619,12 +716,13 @@ Content-Type: application/json
 
 ---
 
-## 16. ACTUALIZAR IMAGEN DE PERFIL
+## 18. ACTUALIZAR IMAGEN DE PERFIL
 **POST** `/profile-image`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -648,12 +746,13 @@ Content-Type: application/json
 
 ---
 
-## 17. EDITAR PERFIL DE USUARIO
+## 19. EDITAR PERFIL DE USUARIO
 **PUT** `/usuario/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -678,12 +777,13 @@ Content-Type: application/json
 
 ---
 
-## 18. ELIMINAR RECETA
+## 20. ELIMINAR RECETA
 **DELETE** `/receta/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -698,12 +798,13 @@ Content-Type: application/json
 
 ---
 
-## 19. EDITAR VALORACIÓN
+## 21. EDITAR VALORACIÓN
 **PUT** `/valoracion/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -726,12 +827,13 @@ Content-Type: application/json
 
 ---
 
-## 20. OBTENER INGREDIENTES DE UNA RECETA
+## 22. OBTENER INGREDIENTES DE UNA RECETA
 **GET** `/ingredientes?receta_id=1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -764,12 +866,13 @@ Content-Type: application/json
 
 ---
 
-## 21. ELIMINAR FAVORITO
+## 23. ELIMINAR FAVORITO
 **DELETE** `/favorito/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -782,12 +885,13 @@ Content-Type: application/json
 
 ---
 
-## 22. ELIMINAR COMENTARIO
+## 24. ELIMINAR COMENTARIO
 **DELETE** `/comentario/1`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -800,12 +904,13 @@ Content-Type: application/json
 
 ---
 
-## 23. ELIMINAR INGREDIENTE DE UNA RECETA
+## 25. ELIMINAR INGREDIENTE DE UNA RECETA
 **DELETE** `/receta/1/ingrediente/2`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -818,12 +923,13 @@ Content-Type: application/json
 
 ---
 
-## 24. ELIMINAR ETIQUETA DE UNA RECETA
+## 26. ELIMINAR ETIQUETA DE UNA RECETA
 **DELETE** `/receta/1/etiqueta/6`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Response esperado:
@@ -836,12 +942,13 @@ Content-Type: application/json
 
 ---
 
-## 25. EDITAR INGREDIENTE DE UNA RECETA
+## 27. EDITAR INGREDIENTE DE UNA RECETA
 **PUT** `/receta/1/ingrediente/2`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -862,12 +969,13 @@ Content-Type: application/json
 
 ---
 
-## 26. EDITAR ETIQUETA DE UNA RECETA
+## 28. EDITAR ETIQUETA DE UNA RECETA
 **PUT** `/receta/1/etiqueta/3`
 
 ### Headers:
 ```
 Content-Type: application/json
+Authorization: Bearer {{token}}
 ```
 
 ### Body:
@@ -887,35 +995,176 @@ Content-Type: application/json
 
 ---
 
+## 29. VISTA PREVIA DE POSTS PERSONALES
+**GET** `/personal_posts_preview`
+
+### Headers:
+```
+Content-Type: application/json
+Authorization: Bearer {{token}}
+```
+
+### Response esperado:
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "titulo": "Tortilla Española Clásica",
+      "dificultad": "Intermedio",
+      "foto_principal": "http://localhost:8000/api/images/posts/tortilla.jpg",
+      "nombre_usuario": "chef_juan",
+      "total_favoritos": 12
+    },
+    {
+      "id": 2,
+      "titulo": "Paella Valenciana",
+      "dificultad": "Difícil",
+      "foto_principal": "http://localhost:8000/api/images/posts/paella.jpg",
+      "nombre_usuario": "chef_juan",
+      "total_favoritos": 8
+    }
+  ]
+}
+```
+
+**Nota:** Este endpoint automáticamente obtiene las recetas del usuario autenticado por el token. No requiere parámetros adicionales.
+
+---
+
+## 30. DETALLES COMPLETOS DE POST PERSONAL
+**GET** `/personal_posts/1`
+
+### Headers:
+```
+Content-Type: application/json
+Authorization: Bearer {{token}}
+```
+
+### Response esperado:
+```json
+{
+  "data": {
+    "id": 1,
+    "titulo": "Tortilla Española Clásica",
+    "descripcion": "La auténtica tortilla de patatas española, cremosa por dentro y dorada por fuera",
+    "tiempo_preparacion": 15,
+    "tiempo_coccion": 20,
+    "porciones": 4,
+    "dificultad": "Intermedio",
+    "foto_principal": "http://localhost:8000/api/images/posts/tortilla.jpg",
+    "instrucciones": "1. Pelar y cortar las patatas en láminas finas. 2. Freír las patatas en aceite abundante. 3. Batir los huevos y mezclar con las patatas. 4. Cuajar en la sartén por ambos lados.",
+    "fecha_creacion": "2025-06-26 12:33:44",
+    "fecha_actualizacion": "2025-06-26 12:33:44",
+    "nombre_usuario": "chef_juan",
+    "foto_perfil": "http://localhost:8000/api/images/profiles/chef_juan.jpg",
+    "categoria_nombre": "Platos Principales",
+    "ingredientes": [
+      {
+        "nombre": "Huevos",
+        "unidad_medida": "unidades",
+        "cantidad": "6.00",
+        "notas": "huevos grandes"
+      },
+      {
+        "nombre": "Patatas",
+        "unidad_medida": "gramos",
+        "cantidad": "500.00",
+        "notas": "patatas medianas"
+      }
+    ],
+    "etiquetas": [
+      {
+        "nombre": "Sin Gluten",
+        "color": "#ffc107"
+      },
+      {
+        "nombre": "Vegetariano",
+        "color": "#28a745"
+      }
+    ],
+    "comentarios": [
+      {
+        "id": 1,
+        "comentario": "¡Excelente receta! Muy fácil de seguir.",
+        "fecha_comentario": "2025-07-01 10:30:00",
+        "nombre_usuario": "maria_cocinera",
+        "foto_perfil": "http://localhost:8000/api/images/profiles/maria.jpg"
+      },
+      {
+        "id": 2,
+        "comentario": "La hice para mi familia y les encantó.",
+        "fecha_comentario": "2025-07-01 09:15:00",
+        "nombre_usuario": "carlos_chef",
+        "foto_perfil": "http://localhost:8000/api/images/profiles/carlos.jpg"
+      }
+    ],
+    "valoraciones": [
+      {
+        "id": 1,
+        "puntuacion": 5,
+        "fecha_valoracion": "2025-07-01 10:30:00",
+        "nombre_usuario": "maria_cocinera",
+        "foto_perfil": "http://localhost:8000/api/images/profiles/maria.jpg"
+      },
+      {
+        "id": 2,
+        "puntuacion": 4,
+        "fecha_valoracion": "2025-07-01 09:15:00",
+        "nombre_usuario": "carlos_chef",
+        "foto_perfil": "http://localhost:8000/api/images/profiles/carlos.jpg"
+      }
+    ],
+    "promedio_valoraciones": 4.5,
+    "total_valoraciones": 2,
+    "total_favoritos": 15
+  }
+}
+```
+
+---
+
 ## Notas Importantes para Postman:
 
-1. **Base URL**: Asegúrate de configurar la variable de entorno `base_url` como `http://localhost:8000/api`
+1. **Autenticación**: 
+   - Primero ejecuta el registro o login para obtener un token
+   - Todos los endpoints protegidos requieren `Authorization: Bearer {{token}}`
+   - Los tokens expiran en 30 días
 
-2. **Headers**: Siempre incluye `Content-Type: application/json`
+2. **Base URL**: Asegúrate de configurar la variable de entorno `base_url` como `http://localhost:8000/api`
 
-3. **Imágenes Base64**: Para las imágenes, usa strings base64 válidos. Los ejemplos son simplificados.
+3. **Headers**: Siempre incluye `Content-Type: application/json` y `Authorization: Bearer {{token}}` para endpoints protegidos
 
-4. **IDs**: Los IDs en los ejemplos son referenciales. Ajusta según los datos reales de tu base de datos.
+4. **Rate Limiting**: 
+   - Registro: 3 intentos por minuto
+   - Login: 5 intentos por minuto
 
-5. **Query Parameters**: Para arrays en query parameters, usa la notación `param[]=valor1&param[]=valor2`
+5. **Imágenes Base64**: Para las imágenes, usa strings base64 válidos. Los ejemplos son simplificados.
 
-6. **Validaciones**: Todos los endpoints incluyen validaciones robustas, así que asegúrate de enviar todos los campos requeridos.
+6. **IDs**: Los IDs en los ejemplos son referenciales. Ajusta según los datos reales de tu base de datos.
 
-7. **Códigos de Error**: La API devuelve códigos de error específicos (400, 404, 560-569) con mensajes descriptivos.
+7. **Query Parameters**: Para arrays en query parameters, usa la notación `param[]=valor1&param[]=valor2`
+
+8. **Validaciones**: Todos los endpoints incluyen validaciones robustas, así que asegúrate de enviar todos los campos requeridos.
+
+9. **Códigos de Error**: La API devuelve códigos de error específicos (400, 401, 404, 422, 429, 560-569) con mensajes descriptivos.
+
+10. **Tokens**: Guarda el token automáticamente usando el script en la pestaña "Tests" del request de login.
 
 ---
 
 ## Orden Recomendado de Pruebas:
 
-1. Obtener listas básicas (categorías, ingredientes, etiquetas)
-2. Crear ingrediente si es necesario
-3. Crear receta
-4. Obtener receta completa
-5. Obtener feed
-6. Buscar por etiquetas
-7. Editar receta
-8. Agregar a favoritos
-9. Crear comentario y valoración
-10. Probar otros endpoints
+1. **Registro o Login** para obtener token
+2. Obtener listas básicas (categorías, ingredientes, etiquetas)
+3. Crear ingrediente si es necesario
+4. Crear receta
+5. Obtener receta completa
+6. Obtener feed
+7. Buscar por etiquetas
+8. Editar receta
+9. Agregar a favoritos
+10. Crear comentario y valoración
+11. Probar otros endpoints
 
 ¡Listo para probar en Postman! 🚀 

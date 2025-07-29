@@ -15,11 +15,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'check.token.expiration' => \App\Http\Middleware\CheckTokenExpiration::class,
             'auth' => \App\Http\Middleware\Authenticate::class,
+            'api.auth' => \App\Http\Middleware\ApiAuthentication::class,
         ]);
         
-        // Configurar Sanctum para APIs
+        // Remover middleware de sesión y CSRF de las rutas API
+        $middleware->web(remove: [
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        ]);
+        
+        // Configurar Sanctum solo para rutas que lo necesiten
         $middleware->api([
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            // Removemos EnsureFrontendRequestsAreStateful para evitar CSRF en APIs
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

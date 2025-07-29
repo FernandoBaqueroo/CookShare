@@ -7,6 +7,107 @@ La API ha sido rediseñada para soportar la nueva estructura de base de datos qu
 - **Etiquetas**: Sistema de etiquetas para categorización y filtrado
 - **Categorías**: Sistema de categorías para organizar recetas
 - **Relaciones mejoradas**: Tablas intermedias para ingredientes y etiquetas
+- **Autenticación**: Sistema completo de autenticación con Laravel Sanctum
+
+## 🔐 Sistema de Autenticación
+
+La API utiliza **Laravel Sanctum** para la autenticación basada en tokens. Todos los endpoints protegidos requieren un token válido en el header de autorización.
+
+### Endpoints de Autenticación
+
+#### 1. Registro de Usuario (POST /register)
+**Propósito:** Crear una nueva cuenta de usuario
+
+**Parámetros requeridos:**
+```json
+{
+  "nombre_usuario": "string (único)",
+  "nombre_completo": "string",
+  "email": "string (único)",
+  "password": "string (mínimo 6 caracteres)"
+}
+```
+
+**Respuesta exitosa (201):**
+```json
+{
+  "token": "1|abc123def456...",
+  "data": {
+    "id": 1,
+    "nombre_usuario": "chef_juan",
+    "email": "juan@ejemplo.com"
+  }
+}
+```
+
+**Validaciones:**
+- `nombre_usuario`: Requerido, único en la tabla usuarios
+- `nombre_completo`: Requerido
+- `email`: Requerido, formato válido, único en la tabla usuarios
+- `password`: Requerido, mínimo 6 caracteres
+
+**Rate Limiting:** 3 intentos por minuto
+
+#### 2. Login de Usuario (POST /login)
+**Propósito:** Autenticar un usuario existente
+
+**Parámetros requeridos:**
+```json
+{
+  "email": "string",
+  "password": "string"
+}
+```
+
+**Respuesta exitosa (200):**
+```json
+{
+  "token": "2|xyz789abc123...",
+  "data": {
+    "id": 1,
+    "nombre_usuario": "chef_juan",
+    "email": "juan@ejemplo.com"
+  }
+}
+```
+
+**Respuesta de error (401):**
+```json
+{
+  "message": "Credenciales incorrectas"
+}
+```
+
+**Rate Limiting:** 5 intentos por minuto
+
+### Uso de Tokens
+
+#### Headers Requeridos para Endpoints Protegidos
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Ejemplo de Uso
+```bash
+curl -X GET "http://localhost:8000/api/feed?usuario_id=1" \
+  -H "Authorization: Bearer 2|xyz789abc123..." \
+  -H "Content-Type: application/json"
+```
+
+### Características del Sistema de Autenticación
+
+1. **Tokens de Acceso:** Generados automáticamente al registrar o hacer login
+2. **Expiración:** Los tokens expiran en 30 días
+3. **Middleware:** Todos los endpoints protegidos usan `auth:sanctum` y `check.token.expiration`
+4. **Seguridad:** Rate limiting para prevenir ataques de fuerza bruta
+5. **Validación:** Verificación automática de tokens en cada request
+
+### Códigos de Error de Autenticación
+
+- `401 Unauthorized`: Token inválido, expirado o no proporcionado
+- `422 Validation Error`: Datos de entrada inválidos
+- `429 Too Many Requests`: Demasiados intentos de login/registro
 
 ## Estructura de Base de Datos
 
@@ -328,6 +429,100 @@ Cambia una etiqueta de una receta por otra.
   "data": { "receta_id": 1, "etiqueta_id_anterior": 3, "nueva_etiqueta_id": 4 }
 }
 ```
+
+### 7. Vista Previa de Posts Personales (GET /personal_posts_preview)
+**Propósito:** Obtener información básica de las recetas del usuario autenticado para mostrar en tarjetas
+
+**Parámetros:**
+- Ninguno (el usuario se identifica automáticamente por el token)
+
+**Respuesta:**
+```json
+{
+  "data": [
+    {
+      "id": "number",
+      "titulo": "string",
+      "dificultad": "string",
+      "foto_principal": "string (URL)",
+      "nombre_usuario": "string",
+      "total_favoritos": "number"
+    }
+  ]
+}
+```
+
+**Códigos de respuesta:**
+- `200`: Lista obtenida exitosamente
+- `401`: Token inválido o no proporcionado
+
+### 8. Detalles Completos de Post Personal (GET /personal_posts/{id})
+**Propósito:** Obtener información completa de una receta específica del usuario autenticado
+
+**Parámetros:**
+- `id`: ID de la receta a obtener (debe pertenecer al usuario autenticado)
+
+**Respuesta:**
+```json
+{
+  "data": {
+    "id": "number",
+    "titulo": "string",
+    "descripcion": "string",
+    "tiempo_preparacion": "number",
+    "tiempo_coccion": "number",
+    "porciones": "number",
+    "dificultad": "string",
+    "foto_principal": "string (URL)",
+    "instrucciones": "string",
+    "fecha_creacion": "string",
+    "fecha_actualizacion": "string",
+    "nombre_usuario": "string",
+    "foto_perfil": "string (URL)",
+    "categoria_nombre": "string",
+    "ingredientes": [
+      {
+        "nombre": "string",
+        "unidad_medida": "string",
+        "cantidad": "string",
+        "notas": "string"
+      }
+    ],
+    "etiquetas": [
+      {
+        "nombre": "string",
+        "color": "string (hex)"
+      }
+    ],
+    "comentarios": [
+      {
+        "id": "number",
+        "comentario": "string",
+        "fecha_comentario": "string",
+        "nombre_usuario": "string",
+        "foto_perfil": "string (URL)"
+      }
+    ],
+    "valoraciones": [
+      {
+        "id": "number",
+        "puntuacion": "number (1-5)",
+        "fecha_valoracion": "string",
+        "nombre_usuario": "string",
+        "foto_perfil": "string (URL)"
+      }
+    ],
+    "promedio_valoraciones": "number (1-5)",
+    "total_valoraciones": "number",
+    "total_favoritos": "number"
+  }
+}
+```
+
+**Códigos de respuesta:**
+- `200`: Receta obtenida exitosamente
+- `401`: Token inválido o no proporcionado
+- `404`: Receta no encontrada, no activa o no pertenece al usuario autenticado
 
 ## Códigos de Error Actualizados
 

@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -506,6 +507,8 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
         $usuario_id = $request->input('usuario_id');
         $foto_perfil = $request->input('foto_perfil');
 
+
+
         if (!$usuario_id || !$foto_perfil) {
             abort(400, 'El usuario_id y la foto_perfil son requeridos');
         }
@@ -516,6 +519,8 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
 
         // Procesar y guardar imagen de perfil.
         $resultadoImagen = procesarImagenPerfil($foto_perfil, $usuario_id);
+        
+
         
         if (!$resultadoImagen['success']) {
             abort(400, $resultadoImagen['error']);
@@ -535,17 +540,7 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
         ], 200);
     });
 
-    //! Ruta simple para servir imágenes de posts
-    Route::get('/images/posts/{filename}', function($filename) {
-        $baseImagePath = env('APP_IMAGES_PATH');
-        $imagePath = $baseImagePath . '/posts/' . $filename;
-        
-        if (!file_exists($imagePath)) {
-            abort(404, 'Imagen de post no encontrada');
-        }
-        
-        return response()->file($imagePath);
-    });
+
 
     //! Ruta para subir una valoracion
     Route::post('/valoracion', function(Request $request) {
@@ -1320,6 +1315,426 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
             'data' => [ 'receta_id' => $receta_id, 'etiqueta_id_anterior' => $etiqueta_id, 'nueva_etiqueta_id' => $nueva_etiqueta_id ]
         ], 200);
     });
+
+    /**
+     * @api {get} /perfil Obtener perfil del usuario autenticado
+     * @apiName GetPerfil
+     * @apiGroup Usuario
+     * @apiSuccess {Object} data Datos del perfil del usuario
+     * @apiSuccess {Number} data.id ID del usuario
+     * @apiSuccess {String} data.nombre_usuario Nombre de usuario
+     * @apiSuccess {String} data.nombre_completo Nombre completo
+     * @apiSuccess {String} data.email Email del usuario
+     * @apiSuccess {String} data.bio Biografía del usuario
+     * @apiSuccess {String} data.foto_perfil URL de la foto de perfil
+     * @apiSuccess {String} data.fecha_registro Fecha de registro
+     */
+    Route::get('/perfil', function(Request $request) {
+        $usuario = $request->user();
+        
+        if (!$usuario) {
+            abort(401, 'Usuario no autenticado');
+        }
+    
+        // Obtener datos completos del usuario
+        $perfil = DB::table('usuarios')
+            ->select([
+                'id',
+                'nombre_usuario',
+                'nombre_completo',
+                'email',
+                'bio',
+                'foto_perfil',
+                'fecha_registro'
+            ])
+            ->where('id', $usuario->id)
+            ->first();
+    
+        if (!$perfil) {
+            abort(404, 'Perfil de usuario no encontrado');
+        }
+    
+        // Construir URL completa para la foto de perfil
+        if ($perfil->foto_perfil) {
+            $perfil->foto_perfil = construirUrlImagen($perfil->foto_perfil, 'profiles');
+        }
+    
+        return response()->json([
+            'data' => $perfil
+        ], 200);
+    });
+
+    /**
+     * @api {put} /perfil Actualizar perfil del usuario autenticado
+     * @apiName UpdatePerfil
+     * @apiGroup Usuario
+     * @apiParam {String} [nombre_usuario] Nuevo nombre de usuario
+     * @apiParam {String} [nombre_completo] Nuevo nombre completo
+     * @apiParam {String} [email] Nuevo email
+     * @apiParam {String} [bio] Nueva biografía
+     * @apiParam {String} [foto_perfil] Nueva foto de perfil (base64)
+     * @apiParam {String} [password_actual] Contraseña actual (requerida si se cambia la contraseña)
+     * @apiParam {String} [password_nuevo] Nueva contraseña
+     * @apiParam {String} [password_confirmar] Confirmación de la nueva contraseña
+     * @apiSuccess {String} message Mensaje de confirmación
+     * @apiSuccess {Object} data Datos de la operación
+     */
+    Route::put('/perfil', function(Request $request) {
+        $usuario = $request->user();
+        
+        if (!$usuario) {
+            abort(401, 'Usuario no autenticado');
+        }
+    
+        $camposEditables = [
+            'nombre_usuario' => $request->input('nombre_usuario'),
+            'nombre_completo' => $request->input('nombre_completo'),
+            'email' => $request->input('email'),
+            'bio' => $request->input('bio'),
+            'foto_perfil' => $request->input('foto_perfil')
+        ];
+    
+        // Verificar que al menos un campo se está actualizando
+        $camposActualizados = array_filter($camposEditables, function($valor) {
+            return $valor !== null;
+        });
+    
+        // Procesar cambio de contraseña si se proporciona
+        $passwordActual = $request->input('password_actual');
+        $passwordNuevo = $request->input('password_nuevo');
+        $passwordConfirmar = $request->input('password_confirmar');
+    
+        if ($passwordNuevo || $passwordConfirmar || $passwordActual) {
+            // Validar que se proporcionen todos los campos de contraseña
+            if (!$passwordActual || !$passwordNuevo || !$passwordConfirmar) {
+                abort(400, 'Para cambiar la contraseña debes proporcionar: contraseña actual, nueva contraseña y confirmación');
+            }
+    
+            // Verificar que la contraseña actual sea correcta
+            if (!Hash::check($passwordActual, $usuario->password)) {
+                abort(400, 'La contraseña actual es incorrecta');
+            }
+    
+            // Verificar que las contraseñas nuevas coincidan
+            if ($passwordNuevo !== $passwordConfirmar) {
+                abort(400, 'La nueva contraseña y su confirmación no coinciden');
+            }
+    
+            // Validar que la nueva contraseña tenga al menos 6 caracteres
+            if (strlen($passwordNuevo) < 6) {
+                abort(400, 'La nueva contraseña debe tener al menos 6 caracteres');
+            }
+    
+            // Agregar la nueva contraseña hasheada a los campos actualizados
+            $camposActualizados['password'] = Hash::make($passwordNuevo);
+        }
+    
+        if (empty($camposActualizados)) {
+            abort(400, 'Debes proporcionar al menos un campo para actualizar');
+        }
+    
+        // Validar nombre de usuario si se proporciona
+        if (isset($camposEditables['nombre_usuario']) && $camposEditables['nombre_usuario'] !== null) {
+            if (empty(trim($camposEditables['nombre_usuario']))) {
+                abort(400, 'El nombre de usuario no puede estar vacío');
+            }
+    
+            // Verificar que el nombre de usuario no esté en uso por otro usuario
+            $usuarioExistente = DB::table('usuarios')
+                ->where('nombre_usuario', trim($camposEditables['nombre_usuario']))
+                ->where('id', '!=', $usuario->id)
+                ->exists();
+    
+            if ($usuarioExistente) {
+                abort(400, 'El nombre de usuario ya está en uso');
+            }
+    
+            $camposActualizados['nombre_usuario'] = trim($camposEditables['nombre_usuario']);
+        }
+    
+        // Validar nombre completo si se proporciona
+        if (isset($camposEditables['nombre_completo']) && $camposEditables['nombre_completo'] !== null) {
+            if (empty(trim($camposEditables['nombre_completo']))) {
+                abort(400, 'El nombre completo no puede estar vacío');
+            }
+            $camposActualizados['nombre_completo'] = trim($camposEditables['nombre_completo']);
+        }
+    
+        // Validar email si se proporciona
+        if (isset($camposEditables['email']) && $camposEditables['email'] !== null) {
+            if (empty(trim($camposEditables['email']))) {
+                abort(400, 'El email no puede estar vacío');
+            }
+    
+            if (!filter_var($camposEditables['email'], FILTER_VALIDATE_EMAIL)) {
+                abort(400, 'El formato del email no es válido');
+            }
+    
+            // Verificar que el email no esté en uso por otro usuario
+            $emailExistente = DB::table('usuarios')
+                ->where('email', trim($camposEditables['email']))
+                ->where('id', '!=', $usuario->id)
+                ->exists();
+    
+            if ($emailExistente) {
+                abort(400, 'El email ya está en uso');
+            }
+    
+            $camposActualizados['email'] = trim($camposEditables['email']);
+        }
+    
+        // Procesar imagen de perfil si se proporciona
+        if (isset($camposEditables['foto_perfil']) && $camposEditables['foto_perfil']) {
+            $resultadoImagen = procesarImagenPerfil($camposEditables['foto_perfil'], $usuario->id);
+            
+            if (!$resultadoImagen['success']) {
+                abort(400, $resultadoImagen['error']);
+            }
+            
+            $camposActualizados['foto_perfil'] = $resultadoImagen['filename'];
+        }
+    
+        // Actualizar el usuario
+        DB::table('usuarios')
+            ->where('id', $usuario->id)
+            ->update($camposActualizados);
+    
+        // Obtener el perfil actualizado
+        $perfilActualizado = DB::table('usuarios')
+            ->select([
+                'id',
+                'nombre_usuario',
+                'nombre_completo',
+                'email',
+                'bio',
+                'foto_perfil',
+                'fecha_registro'
+            ])
+            ->where('id', $usuario->id)
+            ->first();
+    
+        // Construir URL completa para la foto de perfil
+        if ($perfilActualizado->foto_perfil) {
+            $perfilActualizado->foto_perfil = construirUrlImagen($perfilActualizado->foto_perfil, 'profiles');
+        }
+    
+        $mensaje = 'Perfil actualizado exitosamente';
+        if (isset($camposActualizados['password'])) {
+            $mensaje .= ' (incluyendo contraseña)';
+        }
+    
+        return response()->json([
+            'message' => $mensaje,
+            'data' => [
+                'perfil_actualizado' => $perfilActualizado,
+                'campos_modificados' => array_keys($camposActualizados)
+            ]
+        ], 200);
+    })->middleware('auth:sanctum') ->name('perfil.update');
+
+    // --- POSTS PERSONALES ---
+    /**
+     * @api {get} /personal_posts_preview Vista previa de posts personales
+     * @apiSuccess {Object[]} data
+     */
+    Route::get('/personal_posts_preview', function (Request $request) {
+        // Obtener el usuario autenticado del token
+        $usuario = $request->user();
+        $usuarioId = $usuario->id;
+
+        $recetas = DB::table('recetas')
+            ->select([
+                'recetas.id',
+                'recetas.titulo',
+                'recetas.dificultad',
+                'recetas.foto_principal',
+                'usuarios.nombre_usuario'
+            ])
+            ->join('usuarios', 'recetas.usuario_id', '=', 'usuarios.id')
+            ->where('recetas.usuario_id', $usuarioId)
+            ->where('recetas.activa', true)
+            ->orderBy('recetas.fecha_creacion', 'desc')
+            ->get()
+            ->map(function ($receta) {
+                // Construir URL completa para la imagen
+                if ($receta->foto_principal) {
+                    $receta->foto_principal = construirUrlImagen($receta->foto_principal, 'posts');
+                }
+                
+                // Contar favoritos de la receta
+                $totalFavoritos = DB::table('favoritos')
+                    ->where('receta_id', $receta->id)
+                    ->count();
+                
+                $receta->total_favoritos = $totalFavoritos;
+                return $receta;
+            });
+
+        return response()->json([
+            'data' => $recetas
+        ], 200);
+    });
+
+    /**
+     * @api {get} /personal_posts/:id Detalles completos de post personal
+     * @apiParam {Number} id ID de la receta
+     * @apiSuccess {Object} data
+     */
+    Route::get('/personal_posts/{id}', function(Request $request, $id) {
+        // Obtener el usuario autenticado del token
+        $usuario = $request->user();
+        $usuarioId = $usuario->id;
+
+        $receta = DB::table('recetas')
+            ->select([
+                'recetas.id',
+                'recetas.titulo',
+                'recetas.descripcion',
+                'recetas.tiempo_preparacion',
+                'recetas.tiempo_coccion',
+                'recetas.porciones',
+                'recetas.dificultad',
+                'recetas.foto_principal',
+                'recetas.instrucciones',
+                'recetas.fecha_creacion',
+                'recetas.fecha_actualizacion',
+                'usuarios.nombre_usuario',
+                'usuarios.foto_perfil',
+                'categorias.nombre as categoria_nombre'
+            ])
+            ->join('usuarios', 'recetas.usuario_id', '=', 'usuarios.id')
+            ->leftJoin('categorias', 'recetas.categoria_id', '=', 'categorias.id')
+            ->where('recetas.id', $id)
+            ->where('recetas.usuario_id', $usuarioId) // Solo recetas del usuario autenticado
+            ->where('recetas.activa', true)
+            ->first();
+
+        if (!$receta) {
+            abort(404, 'Receta no encontrada o no tienes permisos para verla');
+        }
+
+        // Construir URLs completas para las imágenes
+        if ($receta->foto_principal) {
+            $receta->foto_principal = construirUrlImagen($receta->foto_principal, 'posts');
+        }
+        if ($receta->foto_perfil) {
+            $receta->foto_perfil = construirUrlImagen($receta->foto_perfil, 'profiles');
+        }
+
+        // Obtener ingredientes de la receta
+        $ingredientes = DB::table('receta_ingredientes')
+            ->select([
+                'ingredientes.nombre',
+                'ingredientes.unidad_medida',
+                'receta_ingredientes.cantidad',
+                'receta_ingredientes.notas'
+            ])
+            ->join('ingredientes', 'receta_ingredientes.ingrediente_id', '=', 'ingredientes.id')
+            ->where('receta_ingredientes.receta_id', $id)
+            ->get();
+
+        // Obtener etiquetas de la receta
+        $etiquetas = DB::table('receta_etiquetas')
+            ->select(['etiquetas.nombre', 'etiquetas.color'])
+            ->join('etiquetas', 'receta_etiquetas.etiqueta_id', '=', 'etiquetas.id')
+            ->where('receta_etiquetas.receta_id', $id)
+            ->get();
+
+        // Obtener comentarios de la receta
+        $comentarios = DB::table('comentarios')
+            ->select([
+                'comentarios.id',
+                'comentarios.comentario',
+                'comentarios.fecha_comentario',
+                'usuarios.nombre_usuario',
+                'usuarios.foto_perfil'
+            ])
+            ->join('usuarios', 'comentarios.usuario_id', '=', 'usuarios.id')
+            ->where('comentarios.receta_id', $id)
+            ->where('comentarios.activo', true)
+            ->orderBy('comentarios.fecha_comentario', 'desc')
+            ->get()
+            ->map(function ($comentario) {
+                // Construir URL completa para la foto de perfil
+                if ($comentario->foto_perfil) {
+                    $comentario->foto_perfil = construirUrlImagen($comentario->foto_perfil, 'profiles');
+                }
+                return $comentario;
+            });
+
+        // Obtener valoraciones de la receta
+        $valoraciones = DB::table('valoraciones')
+            ->select([
+                'valoraciones.id',
+                'valoraciones.puntuacion',
+                'valoraciones.fecha_valoracion',
+                'usuarios.nombre_usuario',
+                'usuarios.foto_perfil'
+            ])
+            ->join('usuarios', 'valoraciones.usuario_id', '=', 'usuarios.id')
+            ->where('valoraciones.receta_id', $id)
+            ->orderBy('valoraciones.fecha_valoracion', 'desc')
+            ->get()
+            ->map(function ($valoracion) {
+                // Construir URL completa para la foto de perfil
+                if ($valoracion->foto_perfil) {
+                    $valoracion->foto_perfil = construirUrlImagen($valoracion->foto_perfil, 'profiles');
+                }
+                return $valoracion;
+            });
+
+        // Calcular promedio de valoraciones
+        $promedioValoraciones = 0;
+        $totalValoraciones = $valoraciones->count();
+        
+        if ($totalValoraciones > 0) {
+            $sumaValoraciones = $valoraciones->sum('puntuacion');
+            $promedioValoraciones = round($sumaValoraciones / $totalValoraciones, 1);
+        }
+
+        // Contar favoritos de la receta
+        $totalFavoritos = DB::table('favoritos')
+            ->where('receta_id', $id)
+            ->count();
+
+        // Estructurar la respuesta
+        $receta->ingredientes = $ingredientes;
+        $receta->etiquetas = $etiquetas;
+        $receta->comentarios = $comentarios;
+        $receta->valoraciones = $valoraciones;
+        $receta->promedio_valoraciones = $promedioValoraciones;
+        $receta->total_valoraciones = $totalValoraciones;
+        $receta->total_favoritos = $totalFavoritos;
+
+        return response()->json([
+            'data' => $receta
+        ], 200);
+    });
+});
+
+// --- RUTAS PÚBLICAS PARA SERVIR IMÁGENES ---
+//! Ruta simple para servir imágenes de posts
+Route::get('/images/posts/{filename}', function($filename) {
+    $baseImagePath = env('APP_IMAGES_PATH');
+    $imagePath = $baseImagePath . '/posts/' . $filename;
+    
+    if (!file_exists($imagePath)) {
+        abort(404, 'Imagen de post no encontrada');
+    }
+    
+    return response()->file($imagePath);
+});
+
+//! Ruta simple para servir imágenes de perfil
+Route::get('/images/profiles/{filename}', function($filename) {
+    $baseImagePath = env('APP_IMAGES_PATH');
+    $imagePath = $baseImagePath . '/profiles/' . $filename;
+    
+    if (!file_exists($imagePath)) {
+        abort(404, 'Imagen de perfil no encontrada');
+    }
+    
+    return response()->file($imagePath);
 });
 
 // --- AUTENTICACIÓN: REGISTRO DE USUARIO ---
@@ -1392,4 +1807,3 @@ Route::post('/login', function (Request $request) {
         ]
     ], 200);
 })->middleware('throttle:5,1'); //! 5 intentos por minuto
-

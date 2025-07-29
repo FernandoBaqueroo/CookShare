@@ -155,6 +155,8 @@ function procesarYGuardarImagen($base64String, $directory, $filename, $options =
     ];
     $options = array_merge($defaultOptions, $options);
     
+
+    
     try {
         // 1. Validar formato y tamaño
         if (!validarImagenBase64($base64String)) {
