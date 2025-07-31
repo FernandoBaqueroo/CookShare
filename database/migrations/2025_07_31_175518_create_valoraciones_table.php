@@ -20,7 +20,7 @@ return new class extends Migration
             $table->timestamps();
 
             // Restricción para puntuación entre 1 y 5
-            $table->check('puntuacion >= 1 AND puntuacion <= 5');
+            // $table->check('puntuacion >= 1 AND puntuacion <= 5'); // Comentado por compatibilidad
             
             // Índice único para evitar valoraciones duplicadas
             $table->unique(['usuario_id', 'receta_id'], 'unique_usuario_receta');
