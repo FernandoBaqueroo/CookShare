@@ -228,10 +228,62 @@ curl -X GET "http://localhost:8000/api/feed?usuario_id=1" \
 ```
 
 ### 4. Feed de Recetas (GET /feed)
-**Cambios principales:**
-- Ahora incluye etiquetas básicas
-- Información de fecha de creación
-- Filtrado por recetas activas
+**Propósito:** Obtener feed de recetas de otros usuarios con información básica y métricas de popularidad
+
+**Parámetros requeridos:**
+- `usuario_id`: ID del usuario autenticado (para excluir sus propias recetas)
+
+**Headers requeridos:**
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Respuesta:**
+```json
+{
+  "data": [
+    {
+      "id": "number",
+      "titulo": "string",
+      "descripcion": "string",
+      "dificultad": "string",
+      "foto_principal": "string (URL)",
+      "fecha_creacion": "string",
+      "nombre_usuario": "string",
+      "foto_perfil": "string (URL)",
+      "total_favoritos": "number",
+      "etiquetas": [
+        {
+          "nombre": "string",
+          "color": "string (hex)"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Características:**
+- ✅ **Recuento de favoritos:** Incluye `total_favoritos` para mostrar popularidad
+- ✅ **Etiquetas básicas:** Incluye etiquetas con nombre y color
+- ✅ **Información de fecha:** Ordenado por fecha de creación (más recientes primero)
+- ✅ **Filtrado inteligente:** Excluye recetas del usuario autenticado
+- ✅ **Solo recetas activas:** Filtrado por `activa = true`
+- ✅ **URLs construidas:** Todas las imágenes tienen URLs completas
+
+**Códigos de respuesta:**
+- `200`: Feed obtenido exitosamente
+- `400`: ID de usuario no proporcionado
+- `565`: No existe el usuario con el ID proporcionado
+- `500`: Error interno del servidor
+
+**Ejemplo de uso:**
+```bash
+curl -X GET "http://localhost/api/feed?usuario_id=1" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json"
+```
 
 ### 5. Favoritos (GET /favoritos)
 **Cambios principales:**
@@ -569,4 +621,369 @@ Se han agregado nuevas funciones helper en `functions/api.php`:
 3. **Categorías:** Sistema de categorías para organizar recetas
 4. **Eliminación:** Las recetas se marcan como inactivas, no se eliminan físicamente
 5. **Validaciones:** Validaciones mejoradas para todos los campos
-6. **Relaciones:** Manejo automático de relaciones en tablas intermedias 
+6. **Relaciones:** Manejo automático de relaciones en tablas intermedias
+
+---
+
+## 🎨 Guía para el Frontend
+
+### **Configuración Base**
+
+**URL Base:** `http://localhost` (puerto 80)
+
+**Headers estándar para todas las peticiones:**
+```javascript
+headers: {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json'
+}
+```
+
+**Headers para endpoints protegidos:**
+```javascript
+headers: {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'Authorization': 'Bearer ' + token
+}
+```
+
+### **Flujo de Autenticación**
+
+1. **Registro o Login** para obtener token
+2. **Guardar token** en localStorage o estado de la aplicación
+3. **Incluir token** en todas las peticiones protegidas
+
+### **Ejemplos de Uso para el Feed**
+
+#### **Obtener Feed de Recetas:**
+```javascript
+const obtenerFeed = async (usuarioId, token) => {
+  try {
+    const response = await fetch(`/api/feed?usuario_id=${usuarioId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    return data.data; // Array de recetas
+  } catch (error) {
+    console.error('Error al obtener feed:', error);
+  }
+};
+```
+
+#### **Mostrar Recetas en el Feed:**
+```javascript
+const mostrarRecetas = (recetas) => {
+  recetas.forEach(receta => {
+    const recetaElement = document.createElement('div');
+    recetaElement.className = 'receta-card';
+    
+    recetaElement.innerHTML = `
+      <img src="${receta.foto_principal}" alt="${receta.titulo}" />
+      <h3>${receta.titulo}</h3>
+      <p>${receta.descripcion}</p>
+      <div class="receta-meta">
+        <span class="usuario">
+          <img src="${receta.foto_perfil}" alt="${receta.nombre_usuario}" />
+          ${receta.nombre_usuario}
+        </span>
+        <span class="dificultad">${receta.dificultad}</span>
+        <span class="favoritos">❤️ ${receta.total_favoritos}</span>
+      </div>
+      <div class="etiquetas">
+        ${receta.etiquetas.map(etiqueta => 
+          `<span class="etiqueta" style="background-color: ${etiqueta.color}">
+            ${etiqueta.nombre}
+          </span>`
+        ).join('')}
+      </div>
+    `;
+    
+    document.getElementById('feed-container').appendChild(recetaElement);
+  });
+};
+```
+
+#### **Ordenar por Popularidad:**
+```javascript
+const ordenarPorFavoritos = (recetas) => {
+  return recetas.sort((a, b) => b.total_favoritos - a.total_favoritos);
+};
+
+// Usar
+const recetasPopulares = ordenarPorFavoritos(recetas);
+```
+
+#### **Filtrar Recetas Populares:**
+```javascript
+const filtrarRecetasPopulares = (recetas, minFavoritos = 10) => {
+  return recetas.filter(receta => receta.total_favoritos >= minFavoritos);
+};
+
+// Usar
+const recetasConMuchosFavoritos = filtrarRecetasPopulares(recetas, 15);
+```
+
+### **Manejo de Estados**
+
+#### **Estados de Carga:**
+```javascript
+const [feed, setFeed] = useState([]);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+
+const cargarFeed = async () => {
+  setLoading(true);
+  setError(null);
+  
+  try {
+    const recetas = await obtenerFeed(usuarioId, token);
+    setFeed(recetas);
+  } catch (err) {
+    setError('Error al cargar el feed');
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+#### **Manejo de Errores:**
+```javascript
+const manejarError = (error) => {
+  switch (error.status) {
+    case 400:
+      return 'ID de usuario no proporcionado';
+    case 401:
+      return 'Token inválido o expirado';
+    case 565:
+      return 'Usuario no encontrado';
+    default:
+      return 'Error interno del servidor';
+  }
+};
+```
+
+### **Optimizaciones Recomendadas**
+
+1. **Caché de datos:** Guardar feed en localStorage para carga rápida
+2. **Paginación:** Implementar paginación para feeds grandes
+3. **Actualización automática:** Refrescar feed cada cierto tiempo
+4. **Lazy loading:** Cargar imágenes solo cuando sean visibles
+5. **Debounce:** Evitar múltiples peticiones simultáneas
+
+### **Ejemplo Completo de Componente React**
+
+```jsx
+import React, { useState, useEffect } from 'react';
+
+const FeedComponent = ({ usuarioId, token }) => {
+  const [recetas, setRecetas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [orden, setOrden] = useState('fecha'); // 'fecha' o 'favoritos'
+
+  useEffect(() => {
+    cargarFeed();
+  }, [usuarioId]);
+
+  const cargarFeed = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/feed?usuario_id=${usuarioId}`, {
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      // Ordenar según el estado
+      const recetasOrdenadas = orden === 'favoritos' 
+        ? data.data.sort((a, b) => b.total_favoritos - a.total_favoritos)
+        : data.data;
+        
+      setRecetas(recetasOrdenadas);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div>Cargando...</div>;
+
+  return (
+    <div className="feed-container">
+      <div className="filtros">
+        <button onClick={() => setOrden('fecha')}>Por fecha</button>
+        <button onClick={() => setOrden('favoritos')}>Por popularidad</button>
+      </div>
+      
+      <div className="recetas-grid">
+        {recetas.map(receta => (
+          <div key={receta.id} className="receta-card">
+            <img src={receta.foto_principal} alt={receta.titulo} />
+            <h3>{receta.titulo}</h3>
+            <p>{receta.descripcion}</p>
+            <div className="receta-stats">
+              <span>❤️ {receta.total_favoritos}</span>
+              <span>{receta.dificultad}</span>
+            </div>
+            <div className="etiquetas">
+              {receta.etiquetas.map(etiqueta => (
+                <span 
+                  key={etiqueta.nombre}
+                  className="etiqueta"
+                  style={{ backgroundColor: etiqueta.color }}
+                >
+                  {etiqueta.nombre}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default FeedComponent;
+```
+
+### **Notas Importantes para el Frontend**
+
+1. **URLs de imágenes:** Todas las imágenes tienen URLs completas construidas automáticamente
+2. **Recuento de favoritos:** Se actualiza en tiempo real en cada consulta
+3. **Ordenamiento:** Las recetas vienen ordenadas por fecha de creación (más recientes primero)
+4. **Filtrado:** El feed excluye automáticamente las recetas del usuario autenticado
+5. **Autenticación:** Todos los endpoints requieren token válido
+6. **Rate limiting:** Respeta los límites de peticiones por minuto
+
+---
+
+## 16. OBTENER PERFIL PÚBLICO DE OTRO USUARIO
+
+**Endpoint:** `GET /usuario/{nombre_usuario}`
+
+**Descripción:** Obtiene el perfil público de otro usuario con estadísticas usando su nombre de usuario.
+
+**Autenticación:** Requerida (Bearer Token)
+
+**Parámetros de URL:**
+- `nombre_usuario` (string, requerido): Nombre de usuario a consultar
+
+**Respuesta Exitosa (200):**
+```json
+{
+  "data": {
+    "id": 2,
+    "nombre_usuario": "chef_maria",
+    "nombre_completo": "María López",
+    "bio": "Chef especializada en pastelería francesa",
+    "foto_perfil": "http://localhost/api/images/profiles/2.jpg",
+    "fecha_registro": "2025-01-05 14:30:00",
+    "total_recetas": 8,
+    "total_favoritos_recibidos": 45
+  }
+}
+```
+
+**Códigos de Error:**
+- `401`: Usuario no autenticado
+- `404`: Usuario no encontrado
+
+**Ejemplo de uso:**
+```bash
+curl -X GET "http://localhost/api/usuario/chef_maria" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json"
+```
+
+**Notas importantes:**
+- Los nombres de usuario son únicos en la base de datos
+- Este endpoint es más práctico para el frontend ya que no requiere conocer el ID
+- Incluye estadísticas: total de recetas activas y total de favoritos recibidos
+- La foto de perfil se devuelve con URL completa
+- Solo muestra recetas activas en el conteo
+
+## 17. OBTENER RECETAS DE UN USUARIO
+
+**Endpoint:** `GET /usuario/{nombre_usuario}/recetas`
+
+**Descripción:** Obtiene todas las recetas de un usuario con información completa.
+
+**Autenticación:** Requerida (Bearer Token)
+
+**Parámetros de URL:**
+- `nombre_usuario` (string, requerido): Nombre de usuario
+
+**Respuesta Exitosa (200):**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "titulo": "Tortilla Española Clásica",
+      "descripcion": "La auténtica tortilla de patatas española",
+      "tiempo_preparacion": "15",
+      "tiempo_coccion": "20",
+      "porciones": "4",
+      "dificultad": "Intermedio",
+      "foto_principal": "http://localhost/api/images/posts/1.jpg",
+      "instrucciones": "1. Pelar y cortar las patatas...",
+      "fecha_creacion": "2025-01-15 10:30:00",
+      "fecha_actualizacion": "2025-01-15 10:30:00",
+      "categoria_nombre": "Platos Principales",
+      "total_favoritos": 15,
+      "ingredientes": [
+        {
+          "nombre": "Huevos",
+          "unidad_medida": "unidades",
+          "cantidad": "6.00",
+          "notas": "huevos grandes"
+        },
+        {
+          "nombre": "Patatas",
+          "unidad_medida": "gramos",
+          "cantidad": "500.00",
+          "notas": "patatas medianas"
+        }
+      ],
+      "etiquetas": [
+        {
+          "nombre": "Sin Gluten",
+          "color": "#ffc107"
+        },
+        {
+          "nombre": "Vegetariano",
+          "color": "#28a745"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Códigos de Error:**
+- `401`: Usuario no autenticado
+- `404`: Usuario no encontrado
+
+**Ejemplo de uso:**
+```bash
+curl -X GET "http://localhost/api/usuario/chef_maria/recetas" \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json"
+```
+
+**Notas importantes:**
+- Devuelve solo recetas activas del usuario
+- Incluye información completa: ingredientes, etiquetas, categoría
+- Ordenadas por fecha de creación (más recientes primero)
+- Incluye conteo de favoritos por receta
+- URLs de imágenes procesadas automáticamente
+

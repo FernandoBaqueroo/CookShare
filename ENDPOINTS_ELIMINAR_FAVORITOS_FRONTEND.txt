@@ -1,0 +1,331 @@
+🗑️ ENDPOINTS DE ELIMINACIÓN Y FAVORITOS - GUÍA COMPLETA PARA FRONTEND
+================================================================
+
+🎯 ENDPOINTS DISPONIBLES
+
+1. DELETE /api/receta/{id} - Eliminar post (marcar como inactiva)
+2. POST /api/favorito - Añadir receta a favoritos
+3. DELETE /api/favorito/{id} - Eliminar favorito
+
+================================================================
+
+🗑️ 1. ELIMINAR POST (RECETA)
+==============================
+
+ENDPOINT: DELETE /api/receta/{id}
+
+🔐 AUTENTICACIÓN
+- Requerida: Sí
+- Tipo: Bearer Token
+- Header: Authorization: Bearer {token}
+
+📋 PARÁMETROS DE URL
+- id: number - ID de la receta a eliminar
+
+📤 REQUEST EXAMPLE
+
+const eliminarReceta = async (recetaId) => {
+  try {
+    const response = await fetch(`/api/receta/${recetaId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Receta eliminada:', data);
+    } else {
+      const error = await response.json();
+      console.error('Error:', error);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
+
+✅ RESPONSE SUCCESS (200)
+
+{
+  "message": "Receta eliminada exitosamente",
+  "data": {
+    "receta_id": 25
+  }
+}
+
+❌ CÓDIGOS DE ERROR
+
+| Código | Descripción |
+|--------|-------------|
+| 404 | Receta no encontrada |
+| 401 | No autorizado (token inválido) |
+
+================================================================
+
+❤️ 2. AÑADIR RECETA A FAVORITOS
+================================
+
+ENDPOINT: POST /api/favorito
+
+🔐 AUTENTICACIÓN
+- Requerida: Sí
+- Tipo: Bearer Token
+- Header: Authorization: Bearer {token}
+
+📋 CAMPOS REQUERIDOS
+
+{
+  "receta_id": "number (requerido)",
+  "usuario_id": "number (requerido)"
+}
+
+📤 REQUEST EXAMPLE
+
+const añadirFavorito = async (recetaId, usuarioId) => {
+  try {
+    const response = await fetch('/api/favorito', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        receta_id: recetaId,
+        usuario_id: usuarioId
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Favorito añadido:', data);
+    } else {
+      const error = await response.json();
+      console.error('Error:', error);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
+
+✅ RESPONSE SUCCESS (201)
+
+{
+  "message": "Receta añadida a favoritos exitosamente",
+  "data": {
+    "favorito_id": 15
+  }
+}
+
+❌ CÓDIGOS DE ERROR
+
+| Código | Descripción |
+|--------|-------------|
+| 400 | El receta_id y usuario_id son requeridos |
+| 400 | Ya has añadido esta receta a favoritos |
+| 560 | No existe una receta con el ID proporcionado |
+| 565 | No existe un usuario con el ID proporcionado |
+| 401 | No autorizado (token inválido) |
+
+================================================================
+
+🗑️ 3. ELIMINAR FAVORITO
+=========================
+
+ENDPOINT: DELETE /api/favorito/{id}
+
+🔐 AUTENTICACIÓN
+- Requerida: Sí
+- Tipo: Bearer Token
+- Header: Authorization: Bearer {token}
+
+📋 PARÁMETROS DE URL
+- id: number - ID del favorito a eliminar
+
+📤 REQUEST EXAMPLE
+
+const eliminarFavorito = async (favoritoId) => {
+  try {
+    const response = await fetch(`/api/favorito/${favoritoId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Favorito eliminado:', data);
+    } else {
+      const error = await response.json();
+      console.error('Error:', error);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
+
+✅ RESPONSE SUCCESS (200)
+
+{
+  "message": "Favorito eliminado exitosamente",
+  "data": {
+    "favorito_id": 15
+  }
+}
+
+❌ CÓDIGOS DE ERROR
+
+| Código | Descripción |
+|--------|-------------|
+| 404 | Favorito no encontrado |
+| 401 | No autorizado (token inválido) |
+
+================================================================
+
+💡 RECOMENDACIONES PARA EL FRONTEND
+
+FLUJO DE IMPLEMENTACIÓN:
+
+1. ELIMINAR POST:
+   - Mostrar botón "Eliminar" solo al autor de la receta
+   - Confirmar acción con modal/dialog
+   - Actualizar UI después de eliminar (ocultar receta)
+   - Mostrar mensaje de confirmación
+
+2. AÑADIR FAVORITOS:
+   - Botón "❤️" o "Añadir a favoritos"
+   - Cambiar estado visual inmediatamente (optimistic update)
+   - Manejar error si ya está en favoritos
+   - Actualizar contador de favoritos
+
+3. ELIMINAR FAVORITOS:
+   - Botón "💔" o "Quitar de favoritos"
+   - Cambiar estado visual inmediatamente
+   - Actualizar contador de favoritos
+   - Remover de lista de favoritos
+
+EJEMPLO DE IMPLEMENTACIÓN:
+
+```javascript
+// Componente de receta con botones de acción
+const RecetaCard = ({ receta, usuarioId, onUpdate }) => {
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoritoId, setFavoritoId] = useState(null);
+
+  // Añadir a favoritos
+  const añadirFavorito = async () => {
+    try {
+      const response = await fetch('/api/favorito', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          receta_id: receta.id,
+          usuario_id: usuarioId
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsFavorite(true);
+        setFavoritoId(data.data.favorito_id);
+        // Actualizar contador de favoritos
+        onUpdate();
+      }
+    } catch (error) {
+      console.error('Error al añadir favorito:', error);
+    }
+  };
+
+  // Eliminar favorito
+  const eliminarFavorito = async () => {
+    try {
+      const response = await fetch(`/api/favorito/${favoritoId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setIsFavorite(false);
+        setFavoritoId(null);
+        // Actualizar contador de favoritos
+        onUpdate();
+      }
+    } catch (error) {
+      console.error('Error al eliminar favorito:', error);
+    }
+  };
+
+  // Eliminar receta
+  const eliminarReceta = async () => {
+    if (window.confirm('¿Estás seguro de que quieres eliminar esta receta?')) {
+      try {
+        const response = await fetch(`/api/receta/${receta.id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          // Ocultar receta de la UI
+          onUpdate();
+          alert('Receta eliminada exitosamente');
+        }
+      } catch (error) {
+        console.error('Error al eliminar receta:', error);
+      }
+    }
+  };
+
+  return (
+    <div className="receta-card">
+      <h3>{receta.titulo}</h3>
+      <p>{receta.descripcion}</p>
+      
+      {/* Botón de favorito */}
+      <button 
+        onClick={isFavorite ? eliminarFavorito : añadirFavorito}
+        className={isFavorite ? 'favorito-activo' : 'favorito-inactivo'}
+      >
+        {isFavorite ? '❤️' : '🤍'}
+      </button>
+
+      {/* Botón eliminar (solo para el autor) */}
+      {receta.usuario_id === usuarioId && (
+        <button onClick={eliminarReceta} className="btn-eliminar">
+          🗑️ Eliminar
+        </button>
+      )}
+    </div>
+  );
+};
+```
+
+NOTAS IMPORTANTES:
+
+ELIMINAR POST:
+- La receta se marca como inactiva, no se elimina físicamente
+- Solo el autor puede eliminar su propia receta
+- Después de eliminar, la receta no aparece en feeds ni búsquedas
+
+FAVORITOS:
+- Un usuario no puede añadir la misma receta dos veces
+- El favorito_id se devuelve al crear y se necesita para eliminar
+- Los favoritos se ordenan por fecha (más recientes primero)
+
+SEGURIDAD:
+- Todos los endpoints requieren autenticación
+- Verificar permisos en frontend (solo autor puede eliminar)
+- Manejar errores de token expirado (401)
+
+UI/UX:
+- Usar iconos intuitivos (❤️, 🤍, 🗑️)
+- Confirmar acciones destructivas
+- Actualizar UI inmediatamente (optimistic updates)
+- Mostrar mensajes de éxito/error 

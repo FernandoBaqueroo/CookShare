@@ -398,10 +398,9 @@ Authorization: Bearer {{token}}
       "dificultad": "Intermedio",
       "foto_principal": "http://localhost:8000/api/images/posts/1.jpg",
       "fecha_creacion": "2025-01-20 10:30:00",
-      "usuario": {
-        "nombre_usuario": "chef_juan",
-        "foto_perfil": "http://localhost:8000/api/images/profiles/1.jpg"
-      },
+      "nombre_usuario": "chef_juan",
+      "foto_perfil": "http://localhost:8000/api/images/profiles/1.jpg",
+      "total_favoritos": 15,
       "etiquetas": [
         {
           "nombre": "Sin Gluten",
@@ -798,7 +797,96 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 21. EDITAR VALORACIÓN
+## 21. OBTENER PERFIL PÚBLICO DE OTRO USUARIO
+**GET** `/usuario/chef_maria`
+
+### Headers:
+```
+Content-Type: application/json
+Authorization: Bearer {{token}}
+```
+
+### Response esperado:
+```json
+{
+  "data": {
+    "id": 2,
+    "nombre_usuario": "chef_maria",
+    "nombre_completo": "María López",
+    "bio": "Chef especializada en pastelería francesa",
+    "foto_perfil": "http://localhost/api/images/profiles/2.jpg",
+    "fecha_registro": "2025-01-05 14:30:00",
+    "total_recetas": 8,
+    "total_favoritos_recibidos": 45
+  }
+}
+```
+
+### Response error (404):
+```json
+{
+  "message": "Usuario no encontrado"
+}
+```
+
+---
+
+## 22. OBTENER RECETAS DE UN USUARIO
+**GET** `/usuario/chef_maria/recetas`
+
+### Headers:
+```
+Content-Type: application/json
+Authorization: Bearer {{token}}
+```
+
+### Response esperado:
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "titulo": "Tortilla Española Clásica",
+      "descripcion": "La auténtica tortilla de patatas española",
+      "tiempo_preparacion": "15",
+      "tiempo_coccion": "20",
+      "porciones": "4",
+      "dificultad": "Intermedio",
+      "foto_principal": "http://localhost/api/images/posts/1.jpg",
+      "instrucciones": "1. Pelar y cortar las patatas...",
+      "fecha_creacion": "2025-01-15 10:30:00",
+      "fecha_actualizacion": "2025-01-15 10:30:00",
+      "categoria_nombre": "Platos Principales",
+      "total_favoritos": 15,
+      "ingredientes": [
+        {
+          "nombre": "Huevos",
+          "unidad_medida": "unidades",
+          "cantidad": "6.00",
+          "notas": "huevos grandes"
+        }
+      ],
+      "etiquetas": [
+        {
+          "nombre": "Sin Gluten",
+          "color": "#ffc107"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Response error (404):
+```json
+{
+  "message": "Usuario no encontrado"
+}
+```
+
+---
+
+## 22. EDITAR VALORACIÓN
 **PUT** `/valoracion/1`
 
 ### Headers:
@@ -827,7 +915,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 22. OBTENER INGREDIENTES DE UNA RECETA
+## 23. OBTENER INGREDIENTES DE UNA RECETA
 **GET** `/ingredientes?receta_id=1`
 
 ### Headers:
@@ -866,7 +954,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 23. ELIMINAR FAVORITO
+## 24. ELIMINAR FAVORITO
 **DELETE** `/favorito/1`
 
 ### Headers:
@@ -885,7 +973,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 24. ELIMINAR COMENTARIO
+## 25. ELIMINAR COMENTARIO
 **DELETE** `/comentario/1`
 
 ### Headers:
@@ -904,7 +992,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 25. ELIMINAR INGREDIENTE DE UNA RECETA
+## 26. ELIMINAR INGREDIENTE DE UNA RECETA
 **DELETE** `/receta/1/ingrediente/2`
 
 ### Headers:
@@ -923,7 +1011,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 26. ELIMINAR ETIQUETA DE UNA RECETA
+## 27. ELIMINAR ETIQUETA DE UNA RECETA
 **DELETE** `/receta/1/etiqueta/6`
 
 ### Headers:
@@ -942,7 +1030,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 27. EDITAR INGREDIENTE DE UNA RECETA
+## 28. EDITAR INGREDIENTE DE UNA RECETA
 **PUT** `/receta/1/ingrediente/2`
 
 ### Headers:
@@ -969,7 +1057,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 28. EDITAR ETIQUETA DE UNA RECETA
+## 29. EDITAR ETIQUETA DE UNA RECETA
 **PUT** `/receta/1/etiqueta/3`
 
 ### Headers:
@@ -995,7 +1083,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 29. VISTA PREVIA DE POSTS PERSONALES
+## 30. VISTA PREVIA DE POSTS PERSONALES
 **GET** `/personal_posts_preview`
 
 ### Headers:
@@ -1032,7 +1120,7 @@ Authorization: Bearer {{token}}
 
 ---
 
-## 30. DETALLES COMPLETOS DE POST PERSONAL
+## 31. DETALLES COMPLETOS DE POST PERSONAL
 **GET** `/personal_posts/1`
 
 ### Headers:

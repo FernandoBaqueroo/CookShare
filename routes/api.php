@@ -15,24 +15,10 @@ require_once __DIR__ . '/../functions/api.php';
 
 /**
  * @api {get} /feed Feed de recetas
- * @apiParam {Number} usuario_id
  * @apiSuccess {Object[]} data
  */
 Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function () {
     Route::get('/feed', function (Request $request) {
-        $usuarioId = $request->input('usuario_id');
-        if (!$usuarioId) {
-            abort(400, 'El usuario_id es requerido');
-        }
-
-        $usuarioExiste = DB::table('usuarios')
-            ->where('id', $usuarioId)
-            ->exists();
-
-        if (!$usuarioExiste) {
-            abort(565, 'No existe un usuario con el ID proporcionado');
-        }
-
         $recetas = DB::table('recetas')
             ->select([
                 'recetas.id',
@@ -42,10 +28,10 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
                 'recetas.foto_principal',
                 'recetas.fecha_creacion',
                 'usuarios.nombre_usuario',
-                'usuarios.foto_perfil'
+                'usuarios.foto_perfil',
+                DB::raw('(SELECT COUNT(*) FROM favoritos WHERE favoritos.receta_id = recetas.id) as total_favoritos')
             ])
             ->join('usuarios', 'recetas.usuario_id', '=', 'usuarios.id')
-            ->where('recetas.usuario_id', '!=', $usuarioId)
             ->where('recetas.activa', true)
             ->orderBy('recetas.fecha_creacion', 'desc')
             ->get()
@@ -943,7 +929,7 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
         return response()->json([
             'data' => $ingredientes
         ], 200);
-    });
+    })->middleware('auth:sanctum');
 
     /**
      * @api {post} /ingredientes/crear Crear un nuevo ingrediente
@@ -986,7 +972,7 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
                 'unidad_medida' => $unidad_medida
             ]
         ], 201);
-    });
+    })->middleware('auth:sanctum');
 
     /**
      * @api {get} /etiquetas/lista Obtener lista de etiquetas
@@ -1153,6 +1139,146 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
     });
 
     // --- ENDPOINTS ADICIONALES ---
+
+    /**
+     * @api {post} /favorito Añadir favorito
+     * @apiName AddFavorito
+     * @apiGroup Favoritos
+     * @apiParam {Number} receta_id ID de la receta
+     * @apiParam {Number} usuario_id ID del usuario
+     * @apiSuccess {String} message Mensaje de confirmación
+     * @apiSuccess {Object} data Datos del favorito creado
+     * @apiSuccess {Number} data.favorito_id ID del favorito creado
+     */
+    Route::post('/favorito', function(Request $request) {
+        $validated = $request->validate([
+            'receta_id' => 'required|integer|exists:recetas,id',
+            'usuario_id' => 'required|integer|exists:usuarios,id'
+        ]);
+
+        // Verificar que la receta existe y está activa
+        $receta = DB::table('recetas')
+            ->where('id', $validated['receta_id'])
+            ->where('activa', true)
+            ->first();
+        
+        if (!$receta) {
+            abort(404, 'Receta no encontrada o no está activa');
+        }
+
+        // Verificar que el usuario existe
+        $usuario = DB::table('usuarios')
+            ->where('id', $validated['usuario_id'])
+            ->first();
+        
+        if (!$usuario) {
+            abort(404, 'Usuario no encontrado');
+        }
+
+        // Verificar que no existe ya un favorito para esta receta y usuario
+        $favoritoExistente = DB::table('favoritos')
+            ->where('receta_id', $validated['receta_id'])
+            ->where('usuario_id', $validated['usuario_id'])
+            ->first();
+        
+        if ($favoritoExistente) {
+            abort(400, 'Esta receta ya está en tus favoritos');
+        }
+
+        // Crear el favorito
+        $favoritoId = DB::table('favoritos')->insertGetId([
+            'receta_id' => $validated['receta_id'],
+            'usuario_id' => $validated['usuario_id'],
+            'fecha_favorito' => now()
+        ]);
+
+        return response()->json([
+            'message' => 'Receta añadida a favoritos exitosamente',
+            'data' => [
+                'favorito_id' => $favoritoId,
+                'receta_id' => $validated['receta_id'],
+                'usuario_id' => $validated['usuario_id']
+            ]
+        ], 201);
+    });
+
+    /**
+     * @api {get} /favoritos Obtener favoritos de un usuario
+     * @apiName GetFavoritos
+     * @apiGroup Favoritos
+     * @apiParam {Number} usuario_id ID del usuario
+     * @apiSuccess {Object[]} data Lista de favoritos del usuario
+     */
+    Route::get('/favoritos', function(Request $request) {
+        $usuarioId = $request->input('usuario_id');
+        
+        if (!$usuarioId) {
+            abort(400, 'El usuario_id es requerido');
+        }
+
+        // Verificar que el usuario existe
+        $usuario = DB::table('usuarios')->where('id', $usuarioId)->first();
+        if (!$usuario) {
+            abort(404, 'Usuario no encontrado');
+        }
+
+        $favoritos = DB::table('favoritos')
+            ->select([
+                'favoritos.id',
+                'favoritos.fecha_favorito',
+                'recetas.id as receta_id',
+                'recetas.titulo',
+                'recetas.descripcion',
+                'recetas.dificultad',
+                'recetas.foto_principal',
+                'recetas.fecha_creacion',
+                'usuarios.nombre_usuario',
+                'usuarios.foto_perfil'
+            ])
+            ->join('recetas', 'favoritos.receta_id', '=', 'recetas.id')
+            ->join('usuarios', 'recetas.usuario_id', '=', 'usuarios.id')
+            ->where('favoritos.usuario_id', $usuarioId)
+            ->where('recetas.activa', true)
+            ->orderBy('favoritos.fecha_favorito', 'desc')
+            ->get()
+            ->map(function ($favorito) {
+                // Construir URLs completas para las imágenes
+                if ($favorito->foto_principal) {
+                    $favorito->foto_principal = construirUrlImagen($favorito->foto_principal, 'posts');
+                }
+                if ($favorito->foto_perfil) {
+                    $favorito->foto_perfil = construirUrlImagen($favorito->foto_perfil, 'profiles');
+                }
+                
+                // Obtener etiquetas de la receta
+                $etiquetas = DB::table('receta_etiquetas')
+                    ->select(['etiquetas.nombre', 'etiquetas.color'])
+                    ->join('etiquetas', 'receta_etiquetas.etiqueta_id', '=', 'etiquetas.id')
+                    ->where('receta_etiquetas.receta_id', $favorito->receta_id)
+                    ->get();
+                
+                // Estructurar la respuesta
+                return [
+                    'id' => $favorito->id,
+                    'fecha_favorito' => $favorito->fecha_favorito,
+                    'receta' => [
+                        'id' => $favorito->receta_id,
+                        'titulo' => $favorito->titulo,
+                        'descripcion' => $favorito->descripcion,
+                        'dificultad' => $favorito->dificultad,
+                        'foto_principal' => $favorito->foto_principal,
+                        'fecha_creacion' => $favorito->fecha_creacion,
+                        'nombre_usuario' => $favorito->nombre_usuario,
+                        'foto_perfil' => $favorito->foto_perfil,
+                        'etiquetas' => $etiquetas
+                    ]
+                ];
+            });
+
+        return response()->json([
+            'data' => $favoritos
+        ], 200);
+    });
 
     /**
      * @api {delete} /favorito/{id} Eliminar favorito
@@ -1361,6 +1487,151 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
     
         return response()->json([
             'data' => $perfil
+        ], 200);
+    });
+
+
+
+    /**
+     * @api {get} /usuario/{nombre_usuario} Obtener perfil público de otro usuario por nombre de usuario
+     * @apiName GetUsuarioPublicoPorNombre
+     * @apiGroup Usuario
+     * @apiParam {String} nombre_usuario Nombre de usuario a consultar
+     * @apiSuccess {Object} data Datos del perfil público del usuario
+     * @apiSuccess {Number} data.id ID del usuario
+     * @apiSuccess {String} data.nombre_usuario Nombre de usuario
+     * @apiSuccess {String} data.nombre_completo Nombre completo
+     * @apiSuccess {String} data.bio Biografía del usuario
+     * @apiSuccess {String} data.foto_perfil URL de la foto de perfil
+     * @apiSuccess {String} data.fecha_registro Fecha de registro
+     * @apiSuccess {Number} data.total_recetas Total de recetas del usuario
+     * @apiSuccess {Number} data.total_favoritos_recibidos Total de favoritos recibidos en todas sus recetas
+     */
+    Route::get('/usuario/{nombre_usuario}', function(Request $request, $nombre_usuario) {
+        // Verificar que el usuario existe
+        $usuario = DB::table('usuarios')
+            ->select([
+                'id',
+                'nombre_usuario',
+                'nombre_completo',
+                'bio',
+                'foto_perfil',
+                'fecha_registro'
+            ])
+            ->where('nombre_usuario', $nombre_usuario)
+            ->first();
+    
+        if (!$usuario) {
+            abort(404, 'Usuario no encontrado');
+        }
+    
+        // Construir URL completa para la foto de perfil
+        if ($usuario->foto_perfil) {
+            $usuario->foto_perfil = construirUrlImagen($usuario->foto_perfil, 'profiles');
+        }
+    
+        // Calcular estadísticas del usuario
+        $totalRecetas = DB::table('recetas')
+            ->where('usuario_id', $usuario->id)
+            ->where('activa', true)
+            ->count();
+    
+        $totalFavoritosRecibidos = DB::table('favoritos')
+            ->join('recetas', 'favoritos.receta_id', '=', 'recetas.id')
+            ->where('recetas.usuario_id', $usuario->id)
+            ->where('recetas.activa', true)
+            ->count();
+    
+        $usuario->total_recetas = $totalRecetas;
+        $usuario->total_favoritos_recibidos = $totalFavoritosRecibidos;
+    
+        return response()->json([
+            'data' => $usuario
+        ], 200);
+    });
+
+    /**
+     * @api {get} /usuario/{nombre_usuario}/recetas Obtener recetas de un usuario
+     * @apiName GetRecetasUsuario
+     * @apiGroup Usuario
+     * @apiParam {String} nombre_usuario Nombre de usuario
+     * @apiSuccess {Object[]} data Array de recetas del usuario
+     * @apiSuccess {Number} data.id ID de la receta
+     * @apiSuccess {String} data.titulo Título de la receta
+     * @apiSuccess {String} data.descripcion Descripción de la receta
+     * @apiSuccess {String} data.dificultad Dificultad de la receta
+     * @apiSuccess {String} data.foto_principal URL de la foto principal
+     * @apiSuccess {String} data.fecha_creacion Fecha de creación
+     * @apiSuccess {String} data.categoria_nombre Nombre de la categoría
+     * @apiSuccess {Object[]} data.ingredientes Lista de ingredientes
+     * @apiSuccess {Object[]} data.etiquetas Lista de etiquetas
+     * @apiSuccess {Number} data.total_favoritos Total de favoritos de la receta
+     */
+    Route::get('/usuario/{nombre_usuario}/recetas', function(Request $request, $nombre_usuario) {
+        // Verificar que el usuario existe
+        $usuario = DB::table('usuarios')
+            ->where('nombre_usuario', $nombre_usuario)
+            ->first();
+    
+        if (!$usuario) {
+            abort(404, 'Usuario no encontrado');
+        }
+    
+        // Obtener recetas del usuario con información completa
+        $recetas = DB::table('recetas')
+            ->select([
+                'recetas.id',
+                'recetas.titulo',
+                'recetas.descripcion',
+                'recetas.tiempo_preparacion',
+                'recetas.tiempo_coccion',
+                'recetas.porciones',
+                'recetas.dificultad',
+                'recetas.foto_principal',
+                'recetas.instrucciones',
+                'recetas.fecha_creacion',
+                'recetas.fecha_actualizacion',
+                'categorias.nombre as categoria_nombre',
+                DB::raw('(SELECT COUNT(*) FROM favoritos WHERE favoritos.receta_id = recetas.id) as total_favoritos')
+            ])
+            ->leftJoin('categorias', 'recetas.categoria_id', '=', 'categorias.id')
+            ->where('recetas.usuario_id', $usuario->id)
+            ->where('recetas.activa', true)
+            ->orderBy('recetas.fecha_creacion', 'desc')
+            ->get()
+            ->map(function ($receta) {
+                // Construir URL completa para la foto principal
+                if ($receta->foto_principal) {
+                    $receta->foto_principal = construirUrlImagen($receta->foto_principal, 'posts');
+                }
+                
+                // Obtener ingredientes de la receta
+                $ingredientes = DB::table('receta_ingredientes')
+                    ->select([
+                        'ingredientes.nombre',
+                        'ingredientes.unidad_medida',
+                        'receta_ingredientes.cantidad',
+                        'receta_ingredientes.notas'
+                    ])
+                    ->join('ingredientes', 'receta_ingredientes.ingrediente_id', '=', 'ingredientes.id')
+                    ->where('receta_ingredientes.receta_id', $receta->id)
+                    ->get();
+                
+                // Obtener etiquetas de la receta
+                $etiquetas = DB::table('receta_etiquetas')
+                    ->select(['etiquetas.nombre', 'etiquetas.color'])
+                    ->join('etiquetas', 'receta_etiquetas.etiqueta_id', '=', 'etiquetas.id')
+                    ->where('receta_etiquetas.receta_id', $receta->id)
+                    ->get();
+                
+                $receta->ingredientes = $ingredientes;
+                $receta->etiquetas = $etiquetas;
+                
+                return $receta;
+            });
+    
+        return response()->json([
+            'data' => $recetas
         ], 200);
     });
 
@@ -1710,6 +1981,8 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
             'data' => $receta
         ], 200);
     });
+
+
 });
 
 // --- RUTAS PÚBLICAS PARA SERVIR IMÁGENES ---
@@ -1807,3 +2080,4 @@ Route::post('/login', function (Request $request) {
         ]
     ], 200);
 })->middleware('throttle:5,1'); //! 5 intentos por minuto
+

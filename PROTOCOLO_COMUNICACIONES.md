@@ -73,7 +73,7 @@ Content-Type: application/json
 
 | ENTRADAS | SALIDAS |
 |----------|---------|
-| Query param: usuario_id | ```json<br>[<br>  { "titulo": "string",<br>    "descripcion": "string",<br>    "dificultad": "string",<br>    "foto_principal": "string",<br>    "nombre_usuario": "string",<br>    "foto_perfil": "string",<br>    "etiquetas": [ { "nombre": "string", "color": "string" } ] }<br>]``` |
+| Query param: usuario_id | ```json<br>[<br>  { "titulo": "string",<br>    "descripcion": "string",<br>    "dificultad": "string",<br>    "foto_principal": "string",<br>    "nombre_usuario": "string",<br>    "foto_perfil": "string",<br>    "total_favoritos": "number",<br>    "etiquetas": [ { "nombre": "string", "color": "string" } ] }<br>]``` |
 
 **CÓDIGOS DE RESPUESTA**
 
