@@ -460,21 +460,15 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
 
         // Procesar y guardar imagen usando la función helper
         $foto_principal = $request->input('foto_principal');
-        error_log("DEBUG: Recibiendo foto_principal para receta ID: " . $recetaId);
-        error_log("DEBUG: Longitud de foto_principal: " . strlen($foto_principal));
-        error_log("DEBUG: Primeros 100 caracteres de foto_principal: " . substr($foto_principal, 0, 100));
         
         if ($foto_principal) {
             $resultadoImagen = procesarImagenReceta($foto_principal, $recetaId);
             
             if (!$resultadoImagen['success']) {
-                error_log("DEBUG: Error procesando imagen para receta ID: " . $recetaId);
                 // Si falla el procesamiento de imagen, eliminar la receta creada
                 DB::table('recetas')->where('id', $recetaId)->delete();
                 abort(400, $resultadoImagen['error']);
             }
-            
-            error_log("DEBUG: Imagen procesada exitosamente para receta ID: " . $recetaId . ", archivo: " . $resultadoImagen['filename']);
             
             // Actualizar la ruta de la imagen en la base de datos
             DB::table('recetas')
@@ -1843,6 +1837,7 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
                 'recetas.titulo',
                 'recetas.dificultad',
                 'recetas.foto_principal',
+                'recetas.usuario_id',
                 'usuarios.nombre_usuario'
             ])
             ->join('usuarios', 'recetas.usuario_id', '=', 'usuarios.id')

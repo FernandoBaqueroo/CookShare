@@ -49,6 +49,50 @@ function validarImagenBase64($base64String) {
     return true;
 }
 
+/**
+ * Valida que una URL de imagen sea válida y accesible
+ * @param string $url URL de la imagen
+ * @return bool True si es válida, false si no
+ */
+function validarUrlImagen($url) {
+    // Verificar que sea una URL válida
+    if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        return false;
+    }
+    
+    // Verificar que sea una URL de imagen
+    $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+    $urlLower = strtolower($url);
+    
+    $isImageUrl = false;
+    foreach ($imageExtensions as $ext) {
+        if (strpos($urlLower, '.' . $ext) !== false) {
+            $isImageUrl = true;
+            break;
+        }
+    }
+    
+    if (!$isImageUrl) {
+        return false;
+    }
+    
+    // Verificar que la URL sea accesible (opcional, puede ser lento)
+    $headers = get_headers($url, 1);
+    if ($headers === false) {
+        return false;
+    }
+    
+    // Verificar que el código de respuesta sea 200
+    $responseCode = 0;
+    if (is_array($headers[0])) {
+        $responseCode = (int)substr($headers[0][0], 9, 3);
+    } else {
+        $responseCode = (int)substr($headers[0], 9, 3);
+    }
+    
+    return $responseCode === 200;
+}
+
 function comprimirImagenBase64($base64String) {
     // Extraer los datos base64
     $data = explode(',', $base64String);
@@ -135,14 +179,14 @@ function obtenerExtensionImagen($base64String) {
 }
 
 /**
- * Procesa y guarda una imagen base64 en disco
- * @param string $base64String Imagen en formato base64
+ * Procesa y guarda una imagen (base64 o URL) en disco
+ * @param string $imageData Imagen en formato base64 o URL
  * @param string $directory Directorio donde guardar la imagen
  * @param string $filename Nombre del archivo (sin extensión)
  * @param array $options Opciones adicionales (maxSize, maxWidth, maxHeight, quality, imageType)
  * @return array Array con 'success', 'filename', 'path', 'url' y 'error' si falla
  */
-function procesarYGuardarImagen($base64String, $directory, $filename, $options = []) {
+function procesarYGuardarImagen($imageData, $directory, $filename, $options = []) {
     // Configurar opciones por defecto
     $defaultOptions = [
         'maxSize' => 10 * 1024 * 1024,
@@ -155,15 +199,30 @@ function procesarYGuardarImagen($base64String, $directory, $filename, $options =
     ];
     $options = array_merge($defaultOptions, $options);
     
-    // Log para debugging
-    error_log("DEBUG: Procesando imagen para archivo: " . $filename);
-    error_log("DEBUG: Longitud base64: " . strlen($base64String));
-    error_log("DEBUG: Primeros 100 caracteres: " . substr($base64String, 0, 100));
-    
     try {
+        // Detectar si es URL o base64
+        $isUrl = filter_var($imageData, FILTER_VALIDATE_URL);
+        
+        if ($isUrl) {
+            // Es una URL - descargar la imagen
+            $imageContent = file_get_contents($imageData);
+            
+            if ($imageContent === false) {
+                return [
+                    'success' => false,
+                    'error' => 'No se pudo descargar la imagen desde la URL'
+                ];
+            }
+            
+            // Convertir a base64 para procesamiento
+            $base64String = 'data:image/jpeg;base64,' . base64_encode($imageContent);
+        } else {
+            // Es base64
+            $base64String = $imageData;
+        }
+        
         // 1. Validar formato y tamaño
         if (!validarImagenBase64($base64String)) {
-            error_log("DEBUG: Validación de imagen falló para: " . $filename);
             return [
                 'success' => false,
                 'error' => 'Formato de imagen inválido o tamaño excede el límite permitido'
@@ -172,16 +231,13 @@ function procesarYGuardarImagen($base64String, $directory, $filename, $options =
         
         // 2. Comprimir y optimizar imagen
         $imagenOptimizada = comprimirImagenBase64($base64String);
-        error_log("DEBUG: Imagen optimizada - longitud: " . strlen($imagenOptimizada));
         
         // 3. Obtener extensión
         $extension = obtenerExtensionImagen($imagenOptimizada);
-        error_log("DEBUG: Extensión detectada: " . $extension);
         
         // 4. Crear directorio si no existe
         if (!file_exists($directory)) {
             if (!mkdir($directory, 0755, true)) {
-                error_log("DEBUG: Error creando directorio: " . $directory);
                 return [
                     'success' => false,
                     'error' => 'No se pudo crear el directorio: ' . $directory
@@ -191,14 +247,11 @@ function procesarYGuardarImagen($base64String, $directory, $filename, $options =
         
         // 5. Construir ruta completa del archivo
         $filePath = $directory . '/' . $filename . '.' . $extension;
-        error_log("DEBUG: Ruta del archivo: " . $filePath);
         
         // 6. Decodificar y guardar
         $imageData = base64_decode(explode(',', $imagenOptimizada)[1]);
-        error_log("DEBUG: Tamaño de datos de imagen: " . strlen($imageData));
         
         if (!file_put_contents($filePath, $imageData)) {
-            error_log("DEBUG: Error guardando archivo: " . $filePath);
             return [
                 'success' => false,
                 'error' => 'No se pudo guardar la imagen en: ' . $filePath
@@ -216,8 +269,6 @@ function procesarYGuardarImagen($base64String, $directory, $filename, $options =
         // 8. Generar URL específica según el tipo de imagen
         $urlPath = '/api/images/' . $options['imageType'] . '/' . $filename . '.' . $extension;
         
-        error_log("DEBUG: Imagen guardada exitosamente: " . $filePath);
-        
         return [
             'success' => true,
             'filename' => $filename . '.' . $extension,
@@ -226,7 +277,6 @@ function procesarYGuardarImagen($base64String, $directory, $filename, $options =
         ];
         
     } catch (Exception $e) {
-        error_log("DEBUG: Excepción procesando imagen: " . $e->getMessage());
         return [
             'success' => false,
             'error' => 'Error procesando imagen: ' . $e->getMessage()
@@ -290,21 +340,21 @@ function redimensionarImagenPerfil($filePath, $size = 150) {
 
 /**
  * Valida y procesa una imagen de perfil
- * @param string $base64String Imagen en formato base64
+ * @param string $imageData Imagen en formato base64 o URL
  * @param int $usuarioId ID del usuario
  * @return array Resultado del procesamiento
  */
-function procesarImagenPerfil($base64String, $usuarioId) {
+function procesarImagenPerfil($imageData, $usuarioId) {
     // Usar la ruta base de imágenes y añadir subcarpeta 'profiles'
     $baseImagePath = env('APP_IMAGES_PATH');
     $profileImagePath = $baseImagePath . '/profiles';
     
     // Generar un nombre único basado en el contenido de la imagen y el timestamp
-    $imageHash = md5($base64String);
+    $imageHash = md5($imageData);
     $timestamp = time();
     $uniqueFilename = $usuarioId . '_' . $imageHash . '_' . $timestamp;
     
-    return procesarYGuardarImagen($base64String, $profileImagePath, $uniqueFilename, [
+    return procesarYGuardarImagen($imageData, $profileImagePath, $uniqueFilename, [
         'resizeProfile' => true,
         'profileSize' => 150,
         'maxWidth' => 800,
@@ -315,21 +365,21 @@ function procesarImagenPerfil($base64String, $usuarioId) {
 
 /**
  * Valida y procesa una imagen de receta
- * @param string $base64String Imagen en formato base64
+ * @param string $imageData Imagen en formato base64 o URL
  * @param int $recetaId ID de la receta
  * @return array Resultado del procesamiento
  */
-function procesarImagenReceta($base64String, $recetaId) {
+function procesarImagenReceta($imageData, $recetaId) {
     // Usar la ruta base de imágenes y añadir subcarpeta 'posts'
     $baseImagePath = env('APP_IMAGES_PATH');
     $postsImagePath = $baseImagePath . '/posts';
     
     // Generar un nombre único basado en el contenido de la imagen y el timestamp
-    $imageHash = md5($base64String);
+    $imageHash = md5($imageData);
     $timestamp = time();
     $uniqueFilename = $recetaId . '_' . $imageHash . '_' . $timestamp;
     
-    return procesarYGuardarImagen($base64String, $postsImagePath, $uniqueFilename, [
+    return procesarYGuardarImagen($imageData, $postsImagePath, $uniqueFilename, [
         'maxWidth' => 1200,
         'maxHeight' => 800,
         'quality' => 85,

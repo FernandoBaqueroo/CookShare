@@ -83,6 +83,28 @@ class UsuariosSeeder extends Seeder
             ],
         ];
 
-        DB::table('usuarios')->insert($usuarios);
+        foreach ($usuarios as $usuario) {
+            $usuarioId = DB::table('usuarios')->insertGetId($usuario);
+            
+            // Procesar la imagen si es una URL
+            if (filter_var($usuario['foto_perfil'], FILTER_VALIDATE_URL)) {
+                try {
+                    // Incluir las funciones de procesamiento de imágenes
+                    require_once __DIR__ . '/../../functions/api.php';
+                    
+                    $resultadoImagen = procesarImagenPerfil($usuario['foto_perfil'], $usuarioId);
+                    
+                    if ($resultadoImagen['success']) {
+                        // Actualizar la ruta de la imagen en la base de datos
+                        DB::table('usuarios')
+                            ->where('id', $usuarioId)
+                            ->update(['foto_perfil' => $resultadoImagen['filename']]);
+                    }
+                } catch (Exception $e) {
+                    // Si falla el procesamiento, mantener la URL original
+                    error_log("Error procesando imagen para usuario {$usuarioId}: " . $e->getMessage());
+                }
+            }
+        }
     }
 }
