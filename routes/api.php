@@ -19,20 +19,37 @@ require_once __DIR__ . '/../functions/api.php';
  */
 Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function () {
     Route::get('/feed', function (Request $request) {
+        $usuarioId = $request->input('usuario_id');
+        
+        if (!$usuarioId) {
+            abort(400, 'El usuario_id es requerido');
+        }
+        
+        // Verificar que el usuario existe
+        $usuarioExiste = DB::table('usuarios')->where('id', $usuarioId)->exists();
+        if (!$usuarioExiste) {
+            abort(565, 'No existe un usuario con el ID proporcionado');
+        }
+        
         $recetas = DB::table('recetas')
             ->select([
                 'recetas.id',
                 'recetas.titulo',
                 'recetas.descripcion',
+                'recetas.tiempo_preparacion',
+                'recetas.tiempo_coccion',
+                'recetas.porciones',
                 'recetas.dificultad',
                 'recetas.foto_principal',
                 'recetas.fecha_creacion',
                 'usuarios.nombre_usuario',
                 'usuarios.foto_perfil',
-                DB::raw('(SELECT COUNT(*) FROM favoritos WHERE favoritos.receta_id = recetas.id) as total_favoritos')
+                DB::raw('(SELECT COUNT(*) FROM favoritos WHERE favoritos.receta_id = recetas.id) as total_favoritos'),
+                DB::raw('(SELECT AVG(valoraciones.puntuacion) FROM valoraciones WHERE valoraciones.receta_id = recetas.id) as promedio_valoraciones')
             ])
             ->join('usuarios', 'recetas.usuario_id', '=', 'usuarios.id')
             ->where('recetas.activa', true)
+            ->where('recetas.usuario_id', '!=', $usuarioId) // Excluir recetas del usuario autenticado
             ->orderBy('recetas.fecha_creacion', 'desc')
             ->get()
             ->map(function ($receta) {
@@ -122,6 +139,10 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
             $receta->foto_perfil = construirUrlImagen($receta->foto_perfil, 'profiles');
         }
 
+        // Obtener contadores de favoritos y valoraciones
+        $totalFavoritos = DB::table('favoritos')->where('receta_id', $id)->count();
+        $promedioValoraciones = DB::table('valoraciones')->where('receta_id', $id)->avg('puntuacion');
+
         // Estructurar la respuesta
         $recetaCompleta = [
             'id' => $receta->id,
@@ -135,6 +156,8 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
             'instrucciones' => $receta->instrucciones,
             'fecha_creacion' => $receta->fecha_creacion,
             'fecha_actualizacion' => $receta->fecha_actualizacion,
+            'total_favoritos' => $totalFavoritos,
+            'promedio_valoraciones' => round($promedioValoraciones, 1),
             'usuario' => [
                 'nombre_usuario' => $receta->nombre_usuario,
                 'foto_perfil' => $receta->foto_perfil
@@ -300,10 +323,6 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
                 ];
             });
 
-        if ($comentarios->isEmpty()) {
-            abort(563, 'La receta no tiene comentarios');
-        }
-
         return response()->json([
             'data' => $comentarios
         ], 200);
@@ -330,6 +349,7 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
 
         $valoraciones = DB::table('valoraciones')
             ->select([
+                'valoraciones.id',
                 'recetas.titulo',
                 'usuarios.nombre_usuario',
                 'usuarios.foto_perfil',
@@ -349,15 +369,12 @@ Route::middleware(['auth:sanctum', 'check.token.expiration'])->group(function ()
                         'foto_perfil' => construirUrlImagen($item->foto_perfil, 'profiles')
                     ],
                     'valoracion' => [
+                        'id' => $item->id,
                         'puntuacion' => $item->puntuacion,
                         'fecha_valoracion' => $item->fecha_valoracion
                     ]
                 ];
             });
-
-        if ($valoraciones->isEmpty()) {
-            abort(564, 'La receta no tiene valoraciones');
-        }
 
         return response()->json([
             'data' => $valoraciones

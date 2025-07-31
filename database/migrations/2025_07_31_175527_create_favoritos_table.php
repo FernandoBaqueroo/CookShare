@@ -1,0 +1,37 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('favoritos', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('usuario_id')->constrained('usuarios')->onDelete('cascade');
+            $table->foreignId('receta_id')->constrained('recetas')->onDelete('cascade');
+            $table->timestamp('fecha_favorito')->useCurrent();
+            $table->timestamps();
+
+            // Índice único para evitar favoritos duplicados
+            $table->unique(['usuario_id', 'receta_id'], 'unique_favorito');
+            
+            // Índices para mejorar rendimiento
+            $table->index('fecha_favorito');
+            $table->index(['usuario_id', 'fecha_favorito']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('favoritos');
+    }
+};
