@@ -201,5 +201,3 @@ mkdir storage\images\profiles
 Consulta el archivo `API_DOCUMENTATION.md` y `POSTMAN_EXAMPLES.md` para ver todos los endpoints y ejemplos de uso.
 
 ---
-
-¡Listo! Tu profesor podrá iniciar el proyecto fácilmente en Linux o Windows siguiendo estos pasos. 
